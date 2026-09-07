@@ -8,7 +8,7 @@ It dynamically parses active PulseAudio sound devices, displays them in `dmenu`,
 
 ## 📸 Preview
 
-![FreeBSD Audio Switcher in dmenu](assets/preview.png)
+![FreeBSD Audio Switcher in dmenu](preview.png)
 
 ---
 
