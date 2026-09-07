@@ -1,57 +1,31 @@
-#! /bin/sh
+#!/bin/sh
+# FreeBSD Dynamic Audio Switcher via PulseAudio and dmenu
 
-# Author: Cameron Taylor
-# gemini://camerontaylor.uk
-# gopher://camerontaylor.uk
-# i3wm setup deployment script
-# FreeBSD Desktop
-# Version 0.1
+# Get list of sinks formatted as: "sink_index: Description"
+SINKS=$(pactl list sinks | awk '
+    /^Sink #/ { id=substr($2, 2) }
+    /Description:/ { sub(/^[ \t]*Description: /, ""); print id ": " $0 }
+')
 
-########################################################################################
-#        DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
-#                    Version 2, December 2004
-#
-# Copyright (C) 2004 Sam Hocevar <sam@hocevar.net>
-#
-# Everyone is permitted to copy and distribute verbatim or modified
-# copies of this license document, and changing it is allowed as long
-# as the name is changed.
-#
-#            DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
-#   TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION
-#
-#  0. You just DO WHAT THE FUCK YOU WANT TO.
-########################################################################################
+if [ -z "$SINKS" ]; then
+    notify-send "Audio Switcher" "No PulseAudio sinks found."
+    exit 1
+fi
 
-# Function to change audio output
-change_audio_output() {
-    case $1 in
-        "1")
-            # Change to headphones
-            sysctl hw.snd.default_unit=1
-            echo "Audio output changed to Headphones."
-            ;;
-        "2")
-            # Change to speakers
-            sysctl hw.snd.default_unit=0
-            echo "Audio output changed to Speakers."
-            ;;
-        "q")
-            echo "Exiting."
-            exit 0
-            ;;
-        *)
-            echo "Invalid option. Please choose 1, 2, or q."
-            ;;
-    esac
-}
+# Select sink via dmenu
+SELECTED=$(echo "$SINKS" | dmenu -i -p "Select Audio Output:" -l 10)
 
-while true; do
-    echo "Select audio output:"
-    echo "1) Headphones"
-    echo "2) Speakers"
-    echo "q) Quit"
-    
-    read -r choice
-    change_audio_output "$choice"
+[ -z "$SELECTED" ] && exit 0
+
+# Extract the sink ID
+SINK_ID=$(echo "$SELECTED" | awk -F':' '{print $1}')
+
+# Set default sink for new streams
+pactl set-default-sink "$SINK_ID"
+
+# Move all currently playing audio streams to the new sink
+pactl list sink-inputs | awk '/^Sink Input #/ {print $3}' | while read -r INPUT_ID; do
+    pactl move-sink-input "$INPUT_ID" "$SINK_ID"
 done
+
+notify-send "Audio Switcher" "Switched audio output to sink $SINK_ID"
